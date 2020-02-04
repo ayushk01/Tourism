@@ -23,16 +23,26 @@ var firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
-const AuthStack = createStackNavigator({
-  Login: LoginScreen,
-  Register: RegisterScreen,
-});
+const AuthStack = createStackNavigator(
+  {
+    Login: LoginScreen,
+    Register: RegisterScreen,
+  },
+  {
+    headerMode: 'none',
+  },
+);
 
-const AppStack = createStackNavigator({
-  Home: HomeScreen,
-  Camera: CameraScreen,
-  Image: ImageScreen,
-});
+const AppStack = createStackNavigator(
+  {
+    Home: HomeScreen,
+    Camera: CameraScreen,
+    Image: ImageScreen,
+  },
+  {
+    headerMode: 'none',
+  },
+);
 
 export default createAppContainer(
   createSwitchNavigator(

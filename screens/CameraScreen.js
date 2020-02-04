@@ -9,32 +9,40 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import Icon from 'react-native-ionicons';
 import {RNCamera} from 'react-native-camera';
-import CameraRoll from '@react-native-community/cameraroll';
+import firebase from 'firebase';
 
 class CameraScreen extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      imagePath: null,
+      camera: {
+        type: RNCamera.Constants.Type.back,
+        flashMode: RNCamera.Constants.FlashMode.off,
+      },
+      button: 'flash',
     };
   }
 
   componentDidMount() {
-    this.requestStoragePermission();
+    this.requestPermission();
   }
 
-  requestStoragePermission = async () => {
+  requestPermission = async () => {
     if (Platform.OS === 'android') {
       try {
         const permission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
           PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         );
+        if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission Denied!');
+        }
       } catch (err) {
         Alert.alert(err);
-      }
-      if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Storage Permission Denied!');
       }
     } else {
       Alert.alert('Unsupported for ios');
@@ -45,74 +53,125 @@ class CameraScreen extends React.Component {
     if (this.camera) {
       const options = {quality: 0.5, base64: true};
       const data = await this.camera.takePictureAsync(options);
-      CameraRoll.saveToCameraRoll(data.uri, 'photo')
-        .then(imagePath => this.setState({imagePath}))
-        .catch(err => console.log(err));
+      firebase
+        .storage()
+        .ref()
+        .child('images/image.jpg')
+        .putString('data:image/jpeg;base64,' + data.base64)
+        .then(res => console.log(res))
+        .catch(error => console.log(error));
+    }
+  };
+
+  changeCamera = () => {
+    if (this.state.camera.type === RNCamera.Constants.Type.front) {
+      this.setState({
+        camera: {
+          type: RNCamera.Constants.Type.back,
+        },
+      });
+    } else {
+      this.setState({
+        camera: {
+          type: RNCamera.Constants.Type.front,
+        },
+      });
+    }
+  };
+
+  changeFlash = () => {
+    if (this.state.button === 'flash') {
+      this.setState({
+        button: 'flash-off',
+        camera: {
+          type: this.state.camera.type,
+          flashMode: RNCamera.Constants.FlashMode.off,
+        },
+      });
+    } else {
+      this.setState({
+        button: 'flash',
+        camera: {
+          type: this.state.camera.type,
+          flashMode: RNCamera.Constants.FlashMode.on,
+        },
+      });
     }
   };
 
   render() {
-    if (this.state.imagePath) {
-      return <Image uri={this.state.imagePath} />;
-    } else {
-      return (
-        <View style={styles.container}>
-          <RNCamera
-            ref={ref => {
-              this.camera = ref;
-            }}
-            style={styles.preview}
-            type={RNCamera.Constants.Type.back}
-            flashMode={RNCamera.Constants.FlashMode.on}
-            androidCameraPermissionOptions={{
-              title: 'Permission to use camera',
-              message: 'We need your permission to use your camera',
-              buttonPositive: 'Ok',
-              buttonNegative: 'Cancel',
-            }}
-            androidRecordAudioPermissionOptions={{
-              title: 'Permission to use audio recording',
-              message: 'We need your permission to use your audio',
-              buttonPositive: 'Ok',
-              buttonNegative: 'Cancel',
-            }}
-            onGoogleVisionBarcodesDetected={({barcodes}) => {
-              console.log(barcodes);
-            }}
-          />
-          <View
-            style={{flex: 0, flexDirection: 'row', justifyContent: 'center'}}>
-            <TouchableOpacity
-              onPress={() => this.takePicture()}
-              style={styles.capture}>
-              <Text style={{fontSize: 14}}> SNAP </Text>
-            </TouchableOpacity>
-          </View>
+    return (
+      <View style={styles.container}>
+        <RNCamera
+          ref={ref => {
+            this.camera = ref;
+          }}
+          style={styles.preview}
+          type={this.state.camera.type}
+          flashMode={this.state.camera.flashMode}
+          androidCameraPermissionOptions={{
+            title: 'Permission to use camera',
+            message: 'We need your permission to use your camera',
+            buttonPositive: 'Ok',
+            buttonNegative: 'Cancel',
+          }}
+          androidRecordAudioPermissionOptions={{
+            title: 'Permission to use audio recording',
+            message: 'We need your permission to use your audio',
+            buttonPositive: 'Ok',
+            buttonNegative: 'Cancel',
+          }}
+          onGoogleVisionBarcodesDetected={({barcodes}) => {
+            console.log(barcodes);
+          }}
+        />
+        <View style={styles.buttonBar}>
+          <TouchableOpacity onPress={() => this.changeCamera()}>
+            <Icon name="reverse-camera" style={{color: '#fff'}} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => this.takePicture()}
+            style={styles.capture}>
+            <Text style={{fontSize: 14}}></Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => this.changeFlash()}>
+            <Icon name={this.state.button} style={{color: '#fff'}} />
+          </TouchableOpacity>
         </View>
-      );
-    }
+      </View>
+    );
   }
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'column',
-    backgroundColor: 'black',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   preview: {
     flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   capture: {
     flex: 0,
-    backgroundColor: '#fff',
-    borderRadius: 5,
-    padding: 15,
-    paddingHorizontal: 20,
-    alignSelf: 'center',
-    margin: 20,
+    backgroundColor: 'transparent',
+    borderRadius: 100,
+    padding: 25,
+    paddingHorizontal: 35,
+    borderWidth: 6,
+    borderColor: '#fff',
+    marginLeft: 50,
+    marginRight: 50,
+  },
+  buttonBar: {
+    flexDirection: 'row',
+    marginBottom: 50,
+    alignItems: 'center',
   },
 });
 
